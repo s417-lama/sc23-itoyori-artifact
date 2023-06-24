@@ -1,0 +1,192 @@
+machines:
+  wisteria-o:
+    login_host: wisteria
+    work_dir: /work/gc64/c64050
+    kochi_root: /work/gc64/c64050/.kochi
+    alloc_interact_script:
+      - n_nodes=$(echo $KOCHI_ALLOC_NODE_SPEC | cut -f 1 -d ":" | sed 's/x/*/g' | bc)
+      - pjsub --interact --sparam wait-time=unlimited -j -g gc64 -L rscgrp=interactive-o,node=$KOCHI_ALLOC_NODE_SPEC --mpi proc=$((n_nodes * 48))
+    alloc_script:
+      - n_nodes=$(echo $KOCHI_ALLOC_NODE_SPEC | cut -f 1 -d ":" | sed 's/x/*/g' | bc)
+      - echo "$KOCHI_WORKER_LAUNCH_CMD" | pjsub -X -j -g gc64 -L rscgrp=regular-o,node=$KOCHI_ALLOC_NODE_SPEC,elapse=${KOCHI_ALLOC_TIME_LIMIT:-6:00:00} --mpi proc=$((n_nodes * 48))
+    load_env_script:
+      on_login_node: |
+        module load odyssey > /dev/null
+        export MPICC=mpifccpx
+        export MPICXX=mpiFCCpx
+        export fccpx_ENV="-Nclang -Knolargepage"
+        export FCCpx_ENV="-Nclang -Knolargepage"
+        module load cmake/3.22.2
+      on_machine: |
+        export PATH="/work/gc64/c64050/opt/odyssey/tmux/3.3a/bin:$PATH"
+        . /work/gc64/c64050/venv/odyssey/bin/activate
+        export MPICC=mpifcc
+        export MPICXX=mpiFCC
+        export fcc_ENV="-Nclang -Knolargepage"
+        export FCC_ENV="-Nclang -Knolargepage"
+        module load cmake/3.22.2
+        export PYTHONPATH="/usr/share/gcc-8/python:${PYTHONPATH:+$PYTHONPATH}" # workaround for gdb bug (module 'libstdcxx' not found)
+
+dependencies:
+  massivethreads:
+    git: https://github.com/massivethreads/massivethreads.git
+    recipes:
+      - name: release
+        branch: master
+      - name: develop
+        mirror: true
+        mirror_dir: ../massivethreads
+    script:
+      - CFLAGS="${CFLAGS:+$CFLAGS} -O3 -g -gdwarf-4 -DNDEBUG"
+      - if [[ $KOCHI_MACHINE == wisteria-o ]]; then
+      -   ./configure CC=fccpx CFLAGS="${CFLAGS:+$CFLAGS}" --prefix=$KOCHI_INSTALL_PREFIX --host=aarch64-linux-gnu
+      - else
+      -   ./configure --prefix=$KOCHI_INSTALL_PREFIX CFLAGS="${CFLAGS:+$CFLAGS}"
+      - fi
+      - make -j
+      - make install
+
+  massivethreads-dm:
+    git: https://github.com/s417-lama/massivethreads-dm.git
+    recipes:
+      - name: release
+        branch: ityr
+        script:
+          - CFLAGS="${CFLAGS:+$CFLAGS} -O3 -g -gdwarf-4 -Wall"
+          - CCFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" ./configure MPICC=$MPICC MPICXX=$MPICXX $CONFIGURE_OPTS --with-comm-layer=mpi3 --prefix=$KOCHI_INSTALL_PREFIX
+      - name: prof-stats
+        branch: ityr
+        script:
+          - CFLAGS="${CFLAGS:+$CFLAGS} -O3 -g -gdwarf-4 -Wall"
+          - CCFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" ./configure MPICC=$MPICC MPICXX=$MPICXX $CONFIGURE_OPTS --with-comm-layer=mpi3 --prefix=$KOCHI_INSTALL_PREFIX --enable-logger --disable-logger-trace
+      - name: prof-trace
+        branch: ityr
+        script:
+          - CFLAGS="${CFLAGS:+$CFLAGS} -O3 -g -gdwarf-4 -Wall"
+          - CCFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" ./configure MPICC=$MPICC MPICXX=$MPICXX $CONFIGURE_OPTS --with-comm-layer=mpi3 --prefix=$KOCHI_INSTALL_PREFIX --enable-logger
+      - name: develop
+        mirror: true
+        mirror_dir: ../massivethreads-dm
+        script:
+          - CFLAGS="${CFLAGS:+$CFLAGS} -O3 -g -gdwarf-4 -Wall"
+          - CCFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" ./configure MPICC=$MPICC MPICXX=$MPICXX $CONFIGURE_OPTS --with-comm-layer=mpi3 --prefix=$KOCHI_INSTALL_PREFIX
+    before_script: |
+      $MPICXX --version
+      if [[ $KOCHI_MACHINE == wisteria-o ]]; then
+        CFLAGS="${CFLAGS:+$CFLAGS} -DMADI_NULLIFY_PARENT_STACK=1"
+        CONFIGURE_OPTS="${CONFIGURE_OPTS:+$CONFIGURE_OPTS} --host=aarch64"
+      fi
+      if [[ $KOCHI_MACHINE == local ]]; then
+        CONFIGURE_OPTS="${CONFIGURE_OPTS:+$CONFIGURE_OPTS} --enable-polling"
+      fi
+    after_script:
+      - make -j
+      - make install
+
+  pcas:
+    git: https://github.com/s417-lama/pcas.git
+    recipes:
+      - name: release
+        branch: master
+      - name: develop
+        mirror: true
+        mirror_dir: ../pcas
+      - name: develop_test
+        mirror: true
+        mirror_dir: ../pcas
+        on_machine: true
+        script:
+          - CC=$MPICC CXX=$MPICXX cmake -DCMAKE_INSTALL_PREFIX=$KOCHI_INSTALL_PREFIX .
+          - make all test install
+    script:
+      - CC=$MPICC CXX=$MPICXX cmake -DCMAKE_INSTALL_PREFIX=$KOCHI_INSTALL_PREFIX -DBUILD_TESTING=OFF .
+      - make install
+
+  massivelogger:
+    git: https://github.com/massivethreads/massivelogger.git
+    recipes:
+      - name: release
+        branch: master
+      - name: develop
+        mirror: true
+        mirror_dir: ../massivelogger
+    script:
+      - rm -rf $KOCHI_INSTALL_PREFIX/*
+      - cp -af . $KOCHI_INSTALL_PREFIX
+
+  libunwind:
+    recipes:
+      - name: v1.6.2
+        before_script: LIBUNWIND_VERSION=1.6.2
+    script:
+      - wget http://download.savannah.nongnu.org/releases/libunwind/libunwind-${LIBUNWIND_VERSION}.tar.gz
+      - tar xvf libunwind-${LIBUNWIND_VERSION}.tar.gz
+      - cd libunwind-${LIBUNWIND_VERSION}/
+      - if [[ $KOCHI_MACHINE == wisteria-o ]]; then
+      -   ./configure CC=fccpx CXX=FCCpx --prefix=$KOCHI_INSTALL_PREFIX --host=aarch64-linux-gnu
+      - else
+      -   ./configure --prefix=$KOCHI_INSTALL_PREFIX
+      - fi
+      - make -j
+      - make install
+
+  backward-cpp:
+    git: https://github.com/bombela/backward-cpp
+    depends:
+      - name: libunwind
+        recipe: v1.6.2
+    recipes:
+      - name:   v1.6
+        branch: v1.6
+    script:
+      - mkdir -p $KOCHI_INSTALL_PREFIX/include
+      - cp backward.hpp $KOCHI_INSTALL_PREFIX/include/
+
+  jemalloc:
+    recipes:
+      - name: v5.3.0
+        envs:
+          JEMALLOC_VERSION: 5.3.0
+          CONFIGURE_OPTS: ""
+      - name: v5.3.0-prof
+        envs:
+          JEMALLOC_VERSION: 5.3.0
+          CONFIGURE_OPTS: --enable-prof
+    script:
+      - wget https://github.com/jemalloc/jemalloc/releases/download/${JEMALLOC_VERSION}/jemalloc-${JEMALLOC_VERSION}.tar.bz2
+      - tar xvf jemalloc-${JEMALLOC_VERSION}.tar.bz2
+      - cd jemalloc-${JEMALLOC_VERSION}/
+      - if [[ $KOCHI_MACHINE == wisteria-o ]]; then
+      -   CONFIGURE_OPTS="${CONFIGURE_OPTS:+$CONFIGURE_OPTS} CC=fccpx CXX=FCCpx --host=aarch64-linux-gnu --with-lg-page=16"
+      - fi
+      - ./configure --prefix=$KOCHI_INSTALL_PREFIX $CONFIGURE_OPTS
+      - make -j
+      - make install
+
+  boost:
+    recipes:
+      - name: v1.80.0
+        envs:
+          BOOST_VERSION: 1.80.0
+    script: |
+      BOOST_NAME=boost_$(sed 's/\./_/g' <<< $BOOST_VERSION)
+      wget -q https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/${BOOST_NAME}.tar.bz2
+      tar xf ${BOOST_NAME}.tar.bz2
+      cd ${BOOST_NAME}/
+      ./bootstrap.sh --prefix=$KOCHI_INSTALL_PREFIX
+      if [[ $KOCHI_MACHINE == wisteria-o ]]; then
+        echo "using clang : fcc : FCCpx ;" > user-config.jam
+        CONFIGURE_OPTS="${CONFIGURE_OPTS:+$CONFIGURE_OPTS} --user-config=user-config.jam toolset=clang-fcc"
+      fi
+      ./b2 --with-container pch=off ${CONFIGURE_OPTS:+$CONFIGURE_OPTS} -j $(nproc) install
+    activate_script:
+      - export BOOST_ROOT=$KOCHI_INSTALL_PREFIX_BOOST
+      - export LD_LIBRARY_PATH=$KOCHI_INSTALL_PREFIX_BOOST/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+
+  pcg:
+    git: https://github.com/imneme/pcg-cpp.git
+    recipes:
+      - name: master
+        branch: master
+    script:
+      - cp -r include/ $KOCHI_INSTALL_PREFIX/

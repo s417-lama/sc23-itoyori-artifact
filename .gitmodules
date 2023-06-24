@@ -1,9 +1,0 @@
-[submodule "ityrbench"]
-	path = ityrbench
-	url = https://github.com/s417-lama/ityrbench
-[submodule "massivethreads-dm"]
-	path = massivethreads-dm
-	url = https://github.com/s417-lama/massivethreads-dm
-[submodule "pcas"]
-	path = pcas
-	url = https://github.com/s417-lama/pcas

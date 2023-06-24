@@ -1,0 +1,238 @@
+depends:
+  - name: massivethreads-dm
+    recipe: release
+  - name: pcas
+    recipe: release
+  - name: massivelogger
+    recipe: release
+  - name: backward-cpp
+    recipe: v1.6
+  - name: jemalloc
+    recipe: v5.3.0
+  - name: pcg
+    recipe: master
+  - name: boost
+    recipe: v1.80.0
+
+default_params:
+  nodes: 1
+  cores:
+    - value: 48
+      machines: [wisteria-o]
+    - value: 76
+      machines: [squid-c]
+    - value: 6
+      machines: [local]
+  elem_type: int
+  n_input: 1_000_000
+  repeats: 10
+  verify: 1
+  cutoff_i: 64
+  cutoff_q: 16384
+  cutoff_m: $cutoff_q
+  exec_type: 2 # 0:serial/1:std::sort/2:parallel
+  # common params
+  cache_policy: writeback_lazy # serial/nocache/writethrough/writeback/writeback_lazy/writeback_lazy_wl/getput
+  dist_policy: cyclic # block/cyclic
+  cache_size: 128 # MB
+  block_size: 65536 # bytes
+  sub_block_size: 4096 # bytes
+  max_dirty: $cache_size # MB
+  shared_mem: 1
+  logger: dummy # dummy/trace/stats
+  allocator: sys # sys/jemalloc
+  debugger: 0
+
+default_name: cilksort
+default_queue: node_${nodes}
+default_duplicates: 3
+
+batches:
+  serial:
+    params:
+      nodes: 1
+      cores: 1
+      exec_type: [0, 1] # serial, std_sort
+      n_input: 1_000_000_000
+      repeats: 11
+      cache_policy: serial
+    duplicates: 1
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/n_${n_input}_exec_${exec_type}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/n_${n_input}_exec_${exec_type}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/n_${n_input}_exec_${exec_type}_${duplicate}.out
+
+  scale1G:
+    name: cilksort_${batch_name}
+    params:
+      nodes:
+        - value: [1, 2:torus, 2x3:torus, 2x3x2:torus, 3x4x3:torus, 6x6x4:torus, 8x9x8:torus]
+          machines: [wisteria-o]
+        - value: [1, 2, 4, 8, 16]
+          machines: [squid-c]
+      n_input: 1_000_000_000
+      repeats: 11
+      cache_policy: [nocache, writethrough, writeback, writeback_lazy]
+      logger: stats
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/nodes_${nodes}_p_${cache_policy}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/nodes_${nodes}_p_${cache_policy}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/nodes_${nodes}_p_${cache_policy}_${duplicate}.out
+
+  scale10G:
+    name: cilksort_${batch_name}
+    params:
+      nodes:
+        - value: [2x3:torus, 2x3x2:torus, 3x4x3:torus, 6x6x4:torus, 8x9x8:torus]
+          machines: [wisteria-o]
+      n_input: 10_000_000_000
+      repeats: 11
+      cache_policy: [nocache, writethrough, writeback, writeback_lazy]
+      logger: stats
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/nodes_${nodes}_p_${cache_policy}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/nodes_${nodes}_p_${cache_policy}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/nodes_${nodes}_p_${cache_policy}_${duplicate}.out
+
+  granularity:
+    name: cilksort_${batch_name}
+    params:
+      nodes:
+        - value: 2x3x2:torus
+          machines: [wisteria-o]
+      n_input: 1_000_000_000
+      repeats: 11
+      cutoff_q: [64, 256, 1024, 4096, 16384, 65536]
+      cache_policy: [nocache, writethrough, writeback, writeback_lazy]
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/c_${cutoff_q}_p_${cache_policy}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/c_${cutoff_q}_p_${cache_policy}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/c_${cutoff_q}_p_${cache_policy}_${duplicate}.out
+
+  sbsize:
+    name: cilksort_${batch_name}
+    params:
+      nodes:
+        - value: 3x4x3:torus
+          machines: [wisteria-o]
+      n_input: [1_000_000_000, 10_000_000_000]
+      repeats: 11
+      cache_policy: writeback_lazy
+      sub_block_size: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536]
+      logger: stats
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/n_${n_input}_s_${sub_block_size}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/n_${n_input}_s_${sub_block_size}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/n_${n_input}_s_${sub_block_size}_${duplicate}.out
+
+  getput_shmem:
+    name: cilksort_${batch_name}
+    params:
+      nodes:
+        - value: 1
+          machines: [wisteria-o]
+      n_input: 1_000_000_000
+      repeats: 11
+      cache_policy: [nocache, writeback_lazy, getput]
+      dist_policy: [block, cyclic]
+      logger: stats
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/c_${cache_policy}_d_${dist_policy}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/c_${cache_policy}_d_${dist_policy}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/c_${cache_policy}_d_${dist_policy}_${duplicate}.out
+
+  getput_multinode:
+    name: cilksort_${batch_name}
+    params:
+      nodes:
+        - value: 3x4x3:torus
+          machines: [wisteria-o]
+      n_input: 10_000_000_000
+      repeats: 11
+      cache_policy: [nocache, writeback_lazy, getput]
+      dist_policy: [block, cyclic]
+      logger: stats
+    artifacts:
+      - type: stdout
+        dest: cilksort/${batch_name}/c_${cache_policy}_d_${dist_policy}_${duplicate}.log
+      - type: stats
+        dest: cilksort/${batch_name}/c_${cache_policy}_d_${dist_policy}_${duplicate}.stats
+      - type: file
+        src: mpirun_out.txt
+        dest: cilksort/${batch_name}/c_${cache_policy}_d_${dist_policy}_${duplicate}.out
+
+build:
+  depend_params: [elem_type, cache_policy, dist_policy, block_size, logger]
+  script: |
+    source build_common.bash
+
+    CFLAGS="${CFLAGS:+$CFLAGS} -DNDEBUG"
+    CFLAGS="${CFLAGS:+$CFLAGS} -DITYR_BENCH_ELEM_TYPE=$KOCHI_PARAM_ELEM_TYPE"
+    CFLAGS="${CFLAGS:+$CFLAGS} -DITYR_USE_MPI_WIN_DYNAMIC=false"
+
+    make clean
+    MPICXX=$MPICXX CFLAGS=$CFLAGS make cilksort.out
+
+run:
+  depend_params: [nodes, cores, n_input, repeats, verify, cutoff_i, cutoff_m, cutoff_q, exec_type, cache_size, sub_block_size, max_dirty, shared_mem, logger, allocator, debugger]
+  script: |
+    source run_common.bash
+
+    # export OMPI_MCA_common_tofu_num_mrq_entries=2097152 # 2048, 8192, 32768, 131072 (default), 524288, or 2097152
+    export PCAS_ALLOCATOR_MAX_LOCAL_SIZE=2
+
+    commands="
+      ./cilksort.out
+        -n $KOCHI_PARAM_N_INPUT
+        -r $KOCHI_PARAM_REPEATS
+        -e $KOCHI_PARAM_EXEC_TYPE
+        -c $KOCHI_PARAM_CACHE_SIZE
+        -s $KOCHI_PARAM_SUB_BLOCK_SIZE
+        -v $KOCHI_PARAM_VERIFY
+        -i $KOCHI_PARAM_CUTOFF_I
+        -m $KOCHI_PARAM_CUTOFF_M
+        -q $KOCHI_PARAM_CUTOFF_Q"
+
+    n_nodes=$(echo $KOCHI_PARAM_NODES | cut -f 1 -d ":" | sed 's/x/*/g' | bc)
+
+    if [[ $KOCHI_PARAM_DEBUGGER == 0 ]]; then
+      ityr_mpirun $((n_nodes * KOCHI_PARAM_CORES)) $KOCHI_PARAM_CORES $commands
+    else
+      MPIEXEC=mpitx ityr_mpirun $((n_nodes * KOCHI_PARAM_CORES)) $KOCHI_PARAM_CORES gdb --args $commands
+    fi
+
+    # jeprof_wrap() {
+    #   # FILEPATH=jeprof.${PMIX_RANK}.out
+    #   FILEPATH=cilksort.${PMIX_RANK}
+    #   export MALLOC_CONF="prof:true,lg_prof_interval:30,prof_prefix:$FILEPATH"
+    #   "$@"
+    # }
+    # export -f jeprof_wrap
+
+    # ityr_mpirun $((n_nodes * KOCHI_PARAM_CORES)) $KOCHI_PARAM_CORES bash -c "jeprof_wrap $commands"
+
+    if [[ $KOCHI_PARAM_LOGGER == trace ]]; then run_trace_viewer; fi
