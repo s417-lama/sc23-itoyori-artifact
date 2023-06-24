@@ -39,9 +39,9 @@ dependencies:
     script:
       - CFLAGS="${CFLAGS:+$CFLAGS} -O3 -g -gdwarf-4 -DNDEBUG"
       - if [[ $KOCHI_MACHINE == wisteria-o ]]; then
-      -   ./configure CC=fccpx CFLAGS="${CFLAGS:+$CFLAGS}" --prefix=$KOCHI_INSTALL_PREFIX --host=aarch64-linux-gnu
+      -   ./configure CC=fccpx CFLAGS="${CFLAGS:+$CFLAGS}" --prefix=$KOCHI_INSTALL_PREFIX --host=aarch64-linux-gnu --disable-myth-ld --disable-myth-dl
       - else
-      -   ./configure --prefix=$KOCHI_INSTALL_PREFIX CFLAGS="${CFLAGS:+$CFLAGS}"
+      -   ./configure --prefix=$KOCHI_INSTALL_PREFIX CFLAGS="${CFLAGS:+$CFLAGS}" --disable-myth-ld --disable-myth-dl
       - fi
       - make -j
       - make install
