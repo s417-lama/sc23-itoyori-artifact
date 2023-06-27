@@ -76,33 +76,17 @@ case $KOCHI_MACHINE in
       )
     }
     ;;
-  squid-c)
-    export UCX_TLS=rc_x,self,sm
-    export OMPI_MCA_mca_base_env_list="TERM;LD_PRELOAD;UCX_NET_DEVICES;UCX_MAX_NUM_EPS=inf;UCX_TLS;"
-    # export OMPI_MCA_mca_base_env_list="TERM;LD_PRELOAD;UCX_NET_DEVICES;UCX_MAX_NUM_EPS=inf;UCX_TLS;UCX_LOG_LEVEL=info;"
-    # export OMPI_MCA_mca_base_env_list="TERM;LD_PRELOAD;UCX_NET_DEVICES;UCX_MAX_NUM_EPS=inf;UCX_TLS;UCX_LOG_LEVEL=func;UCX_LOG_FILE=ucxlog.%h.%p;"
+  local)
     ityr_mpirun() {
+      # for ChameleonCloud compute_cascadelake_r_ib
       local n_processes=$1
       local n_processes_per_node=$2
-
-      trap "compgen -G ${STDOUT_FILE}.* && tail -n +1 \$(ls ${STDOUT_FILE}.* -v) > $STDOUT_FILE && rm ${STDOUT_FILE}.*" EXIT
-
+      export UCX_NET_DEVICES="mlx5_2:1"
+      export OMPI_MCA_mca_base_env_list="UCX_NET_DEVICES"
       $MPIEXEC -n $n_processes -N $n_processes_per_node \
-        --output file=$STDOUT_FILE \
-        --prtemca ras simulator \
-        --prtemca plm_ssh_agent ssh \
-        --prtemca plm_ssh_args " -i /sqfs/home/v60680/sshd/ssh_client_rsa_key -o StrictHostKeyChecking=no -p 50000 -q" \
-        --hostfile $NQSII_MPINODES \
+        --hostfile $HOME/share/hostfile \
         --mca btl ^ofi \
         --mca osc_ucx_acc_single_intrinsic true \
-        setarch $(uname -m) --addr-no-randomize "${@:3}"
-    }
-    ;;
-  *)
-    ityr_mpirun() {
-      local n_processes=$1
-      local n_processes_per_node=$2
-      $MPIEXEC -n $n_processes -N $n_processes_per_node \
         -- setarch $(uname -m) --addr-no-randomize "${@:3}" | tee $STDOUT_FILE
     }
     ;;

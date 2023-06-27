@@ -19,13 +19,12 @@ default_params:
   cores:
     - value: 48
       machines: [wisteria-o]
-    - value: 76
-      machines: [squid-c]
-    - value: 6
+    - value: 48
       machines: [local]
   elem_type: int
   n_input: 1_000_000
-  repeats: 10
+  # repeats: 11
+  repeats: 4
   verify: 1
   cutoff_i: 64
   cutoff_q: 16384
@@ -45,7 +44,8 @@ default_params:
 
 default_name: cilksort
 default_queue: node_${nodes}
-default_duplicates: 3
+# default_duplicates: 3
+default_duplicates: 1
 
 batches:
   serial:
@@ -54,7 +54,6 @@ batches:
       cores: 1
       exec_type: [0, 1] # serial, std_sort
       n_input: 1_000_000_000
-      repeats: 11
       cache_policy: serial
     duplicates: 1
     artifacts:
@@ -72,10 +71,9 @@ batches:
       nodes:
         - value: [1, 2:torus, 2x3:torus, 2x3x2:torus, 3x4x3:torus, 6x6x4:torus, 8x9x8:torus]
           machines: [wisteria-o]
-        - value: [1, 2, 4, 8, 16]
-          machines: [squid-c]
+        - value: [1, 2, 4]
+          machines: [local]
       n_input: 1_000_000_000
-      repeats: 11
       cache_policy: [nocache, writethrough, writeback, writeback_lazy]
       logger: stats
     artifacts:
@@ -93,8 +91,9 @@ batches:
       nodes:
         - value: [2x3:torus, 2x3x2:torus, 3x4x3:torus, 6x6x4:torus, 8x9x8:torus]
           machines: [wisteria-o]
+        - value: [1, 2, 4]
+          machines: [local]
       n_input: 10_000_000_000
-      repeats: 11
       cache_policy: [nocache, writethrough, writeback, writeback_lazy]
       logger: stats
     artifacts:
@@ -112,8 +111,9 @@ batches:
       nodes:
         - value: 2x3x2:torus
           machines: [wisteria-o]
+        - value: 4
+          machines: [local]
       n_input: 1_000_000_000
-      repeats: 11
       cutoff_q: [64, 256, 1024, 4096, 16384, 65536]
       cache_policy: [nocache, writethrough, writeback, writeback_lazy]
     artifacts:
@@ -132,7 +132,6 @@ batches:
         - value: 3x4x3:torus
           machines: [wisteria-o]
       n_input: [1_000_000_000, 10_000_000_000]
-      repeats: 11
       cache_policy: writeback_lazy
       sub_block_size: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536]
       logger: stats
@@ -152,7 +151,6 @@ batches:
         - value: 1
           machines: [wisteria-o]
       n_input: 1_000_000_000
-      repeats: 11
       cache_policy: [nocache, writeback_lazy, getput]
       dist_policy: [block, cyclic]
       logger: stats
@@ -172,7 +170,6 @@ batches:
         - value: 3x4x3:torus
           machines: [wisteria-o]
       n_input: 10_000_000_000
-      repeats: 11
       cache_policy: [nocache, writeback_lazy, getput]
       dist_policy: [block, cyclic]
       logger: stats

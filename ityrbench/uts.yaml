@@ -19,12 +19,11 @@ default_params:
   cores:
     - value: 48
       machines: [wisteria-o]
-    - value: 76
-      machines: [squid-c]
-    - value: 6
+    - value: 48
       machines: [local]
   tree: T1L # T1L/T1XL/T1XXL/T1WL
-  repeats: 10
+  # repeats: 11
+  repeats: 4
   exec_type: parallel # serial/parallel
   # common params
   cache_policy: writeback_lazy # serial/nocache/writethrough/writeback/writeback_lazy/writeback_lazy_wl/getput
